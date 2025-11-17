@@ -3,14 +3,13 @@ import pandas as pd
 from pyvis.network import Network
 import streamlit.components.v1 as components
 import uuid
-import io
 
-st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="Magnifying Glass")
+st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="🔍")
 
 st.sidebar.success("AnalystForge Pro – Public / Internal Use")
-st.sidebar.caption("No login • Fully working Nov 2025")
+st.sidebar.caption("No login • PyVis fixed for Streamlit Cloud Nov 2025")
 
-st.title("AnalystForge Pro – Full i2 Analyst’s Notebook Replacement")
+st.title("AnalystForge Pro – Full i2 Analyst's Notebook Replacement")
 st.caption("Entity Library • Drag & Drop • Used by AU law enforcement & OSINT teams")
 
 # ======================== INITIALISE DATA ========================
@@ -95,7 +94,7 @@ with st.sidebar.expander("Entity Library", expanded=True):
 
     st.write(f"**{len(lib)} entities**")
     for _, row in lib.iterrows():
-        icon = {"Person":"Person","Organisation":"Building","Vehicle":"Car","Phone":"Phone","Bank Account":"Credit Card","Location":"Location"}.get(row["Type"], "Circle")
+        icon = {"Person":"👤","Organisation":"🏢","Vehicle":"🚗","Phone":"📱","Bank Account":"🏦","Location":"📍"}.get(row["Type"], "⚪")
         if st.button(f"{icon} {row['Label']}", key=f"pick_{row['ID']}"):
             st.session_state.selected_for_canvas.append(row.to_dict())
             st.success(f"Selected → {row['Label']}")
@@ -115,7 +114,7 @@ with c1:
             st.session_state.selected_for_canvas = []
             st.rerun()
 
-    # ========= FIXED PYVIS (no filesystem error) =========
+    # ========= FIXED PYVIS (use generate_html() – no file I/O) =========
     net = Network(height="800px", bgcolor="#0e1117", font_color="#ffffff", directed=True, notebook=True)
     net.force_atlas_2based()
 
@@ -128,17 +127,15 @@ with c1:
         if photo:
             net.add_node(label, shape="circularImage", image=photo, title=title)
         else:
-            net.add_node(label, color=colors.get(ent["Type"], "#888888"), title=title)
+            net.add_node(label, color=colors.get(ent["Type"], "#888888"), title=title, size=25)
 
     for link in st.session_state.graph_links:
-        net.add_edge(link["Source"], link["Target"], label=link.get("Type", ""), color="#cccccc", arrows="to")
+        net.add_edge(link["Source"], link["Target"], label=link.get("Type", ""), color="#cccccc", arrows="to", width=2)
 
-    # Save to string instead of file
-    html_buffer = io.StringIO()
-    net.save_graph(html_buffer)
-    html_bytes = html_buffer.getvalue()
+    # Get HTML string directly (PyVis official Streamlit fix)
+    html_string = net.generate_html(notebook=False)
 
-    components.html(html_bytes, height=800, scrolling=True)
+    components.html(html_string, height=800, scrolling=True)
     # =====================================================
 
     # Quick link creator
@@ -154,6 +151,7 @@ with c1:
 
 with c2:
     st.subheader("On Canvas")
+    st.write(f"**{len(st.session_state.graph_entities)} entities**")
     for ent in st.session_state.graph_entities:
         if st.button(f"Remove {ent['Label']}", key=f"rm_{ent['ID']}"):
             st.session_state.graph_entities = [e for e in st.session_state.graph_entities if e["ID"] != ent["ID"]]
