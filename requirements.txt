@@ -1,0 +1,7 @@
+streamlit
+streamlit-authenticator
+pyvis
+networkx
+pandas
+plotly
+pyyaml
