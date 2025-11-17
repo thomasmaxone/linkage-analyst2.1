@@ -5,22 +5,22 @@ import streamlit.components.v1 as components
 import uuid
 from datetime import date
 
-st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="Detective")
+st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="🔍")
 
-st.sidebar.success("AnalystForge Pro – Australian Police Standard 2025")
-st.sidebar.caption("Physical icons on canvas • Label + data below")
+st.sidebar.success("AnalystForge Pro – AU Police Standard 2025")
+st.sidebar.caption("Fixed IDs • Physical icons • Label + data under icon")
 
-st.title("AnalystForge Pro – Full i2 Analyst’s Notebook Replacement")
-st.caption("Real physical symbols • Data displayed under icon • Used by NSW/VIC/QLD Police")
+st.title("AnalystForge Pro – Full i2 Analyst's Notebook Replacement")
+st.caption("Real physical symbols • Drag & drop • Bulletproof linking")
 
-# High-quality physical icons (hosted on GitHub – never break)
+# Physical icons (high-quality PNGs – fast & reliable)
 ICONS = {
-    "Person":       "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/person-silhouette.png",
-    "Organisation": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/factory.png",
-    "Vehicle":      "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/car-side.png",
-    "Phone":        "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/smartphone.png",
-    "Bank Account": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/bank-building.png",
-    "Location":     "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/house.png"
+    "Person":       "https://raw.githubusercontent.com/twbs/icons/main/icons/person.svg",
+    "Organisation": "https://raw.githubusercontent.com/twbs/icons/main/icons/building.svg",
+    "Vehicle":      "https://raw.githubusercontent.com/twbs/icons/main/icons/car-front.svg",
+    "Phone":        "https://raw.githubusercontent.com/twbs/icons/main/icons/phone.svg",
+    "Bank Account": "https://raw.githubusercontent.com/twbs/icons/main/icons/building.svg",
+    "Location":     "https://raw.githubusercontent.com/twbs/icons/main/icons/house.svg"
 }
 
 # Initialise
@@ -117,10 +117,11 @@ with c1:
             st.session_state.selected = []
             st.rerun()
 
-    # Build network with PHYSICAL ICONS + LABEL BELOW
+    # Build network with PHYSICAL ICONS + LABEL BELOW (FIXED IDs)
     net = Network(height="850px", bgcolor="#1a1a1a", font_color="#ffffff", directed=True, notebook=True)
     net.force_atlas_2based()
 
+    # Add nodes first (using UUID IDs)
     for ent in st.session_state.canvas:
         # Main info under icon
         lines = [ent["label"]]
@@ -141,7 +142,7 @@ with c1:
         tooltip = "<br>".join(tooltip_lines)
 
         net.add_node(
-            ent["id"],
+            ent["id"],  # Use UUID ID
             label=label_below,
             shape="image",
             image=ent["icon"],
@@ -151,20 +152,22 @@ with c1:
             scaling={"label": True}
         )
 
+    # Add links (FIXED: Use UUID IDs for source/target)
     for link in st.session_state.links:
-        net.add_edge(link["from"], link["to"], label=link["type"], color="#3498db", width=3, arrows="to")
+        # Ensure nodes exist (safety check)
+        if link["from"] in [e["id"] for e in st.session_state.canvas] and link["to"] in [e["id"] for e in st.session_state.canvas]:
+            net.add_edge(link["from"], link["to"], label=link["type"], color="#3498db", width=3, arrows="to")
 
     components.html(net.generate_html(), height=850, scrolling=True)
 
-    # Link creator
+    # Link creator (FIXED: Use UUID IDs)
     if len(st.session_state.canvas) >= 2:
         st.markdown("### Create Link")
-        from_node = st.selectbox("From", [e["label"] for e in st.session_state.canvas], key="f")
-        to_node = st.selectbox("To", [e["label"] for e in st.session_state.canvas], key="t")
+        canvas_labels = {e["id"]: e["label"] for e in st.session_state.canvas}
+        from_id = st.selectbox("From", list(canvas_labels.keys()), format_func=lambda x: canvas_labels[x], key="f")
+        to_id = st.selectbox("To", list(canvas_labels.keys()), format_func=lambda x: canvas_labels[x], key="t")
         link_type = st.text_input("Link Type", "Owns / Calls / Lives At / Works At", key="lt")
         if st.button("Add Link", type="primary"):
-            from_id = next(e["id"] for e in st.session_state.canvas if e["label"] == from_node)
-            to_id = next(e["id"] for e in st.session_state.canvas if e["label"] == to_node)
             st.session_state.links.append({"from": from_id, "to": to_id, "type": link_type})
             st.success("Link created")
             st.rerun()
@@ -174,6 +177,8 @@ with c2:
     for ent in st.session_state.canvas:
         if st.button(f"Remove {ent['label']}", key=f"rem_{ent['id']}"):
             st.session_state.canvas = [e for e in st.session_state.canvas if e["id"] != ent["id"]]
+            # Clean up links
+            st.session_state.links = [l for l in st.session_state.links if l["from"] != ent["id"] and l["to"] != ent["id"]]
             st.rerun()
 
 # Export
@@ -187,5 +192,6 @@ with st.expander("Export Canvas"):
         df = pd.DataFrame(export)
         st.download_button("Download Entities CSV", df.to_csv(index=False), "entities.csv")
     if st.session_state.links:
-        df_l = pd.DataFrame([{"From": l["from"], "To": l["to"], "Type": l["type"]} for l in st.session_state.links])
+        links_export = [{"From": canvas_labels.get(l["from"], l["from"]), "To": canvas_labels.get(l["to"], l["to"]), "Type": l["type"]} for l in st.session_state.links]
+        df_l = pd.DataFrame(links_export)
         st.download_button("Download Links CSV", df_l.to_csv(index=False), "links.csv")
