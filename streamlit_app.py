@@ -7,20 +7,20 @@ from datetime import date
 
 st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="Detective")
 
-st.sidebar.success("AnalystForge Pro – AU Law Enforcement Standard")
-st.sidebar.caption("Real icons • Full linking • 100% working Nov 2025")
+st.sidebar.success("AnalystForge Pro – AU Police Standard")
+st.sidebar.caption("Real icons on canvas • Nov 2025")
 
-st.title("AnalystForge Pro – i2 Analyst’s Notebook Replacement")
-st.caption("With proper entity symbols • Drag & drop • Full node linking")
+st.title("AnalystForge Pro – Full i2 Analyst’s Notebook Replacement")
+st.caption("Real entity symbols on canvas • Drag & drop • Full linking")
 
-# Entity styles (exact i2 look)
-ENTITY_STYLES = {
-    "Person":       {"icon": "Person", "color": "#e74c3c"},
-    "Organisation": {"icon": "Office Building", "color": "#9b59b6"},
-    "Vehicle":      {"icon": "Car", "color": "#3498db"},
-    "Phone":        {"icon": "Phone", "color": "#2ecc71"},
-    "Bank Account": {"icon": "Bank", "color": "#f1c40f"},
-    "Location":     {"icon": "Location Pin", "color": "#e67e22"}
+# Proper icons for each entity type (exactly like i2)
+ICON_URLS = {
+    "Person":       "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/person.png",
+    "Organisation": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/building.png",
+    "Vehicle":      "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/car.png",
+    "Phone":        "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/phone.png",
+    "Bank Account": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/bank.png",
+    "Location":     "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/pin.png"
 }
 
 # Initialise
@@ -36,7 +36,7 @@ if "selected" not in st.session_state:
 # ======================== LIBRARY ========================
 with st.sidebar.expander("Entity Library", expanded=True):
     st.subheader("Add New Entity")
-    entity_type = st.selectbox("Type", list(ENTITY_STYLES.keys()))
+    entity_type = st.selectbox("Type", list(ICON_URLS.keys()))
 
     data_dict = {}
     photo_url = ""
@@ -76,7 +76,6 @@ with st.sidebar.expander("Entity Library", expanded=True):
         with c2: data_dict["State"] = st.selectbox("State", ["NSW","VIC","QLD","WA","SA","TAS","ACT","NT"], key="l3")
 
     if st.button("Add to Library", type="primary"):
-        # Generate label
         labels = {
             "Person": f"{data_dict.get('First','')} {data_dict.get('Last','')}".strip() or "Unknown Person",
             "Organisation": data_dict.get("Name", "Unknown Org"),
@@ -90,14 +89,13 @@ with st.sidebar.expander("Entity Library", expanded=True):
             "Type": entity_type,
             "Label": labels[entity_type],
             "Data": data_dict,
-            "PhotoURL": photo_url
+            "PhotoURL": photo_url or ICON_URLS[entity_type]  # fallback to icon
         }
-        st.session_state.entity_library = pd.concat(
-            [st.session_state.entity_library, pd.DataFrame([new_entity])], ignore_index=True)
-        st.success(f"Added {ENTITY_STYLES[entity_type]['icon']} {new_entity['Label']}")
+        st.session_state.entity_library = pd.concat([st.session_state.entity_library, pd.DataFrame([new_entity])], ignore_index=True)
+        st.success(f"Added {new_entity['Label']}")
         st.rerun()
 
-    # Search library
+    # Search & display
     search = st.text_input("Search Library", key="search")
     lib = st.session_state.entity_library
     if search:
@@ -105,10 +103,9 @@ with st.sidebar.expander("Entity Library", expanded=True):
 
     st.write(f"**{len(lib)} entities**")
     for _, row in lib.iterrows():
-        icon = ENTITY_STYLES[row["Type"]]["icon"]
-        if st.button(f"{icon} {row['Label']}", key=f"lib_{row['ID']}"):
+        if st.button(f"{row['Type']} {row['Label']}", key=f"lib_{row['ID']}"):
             st.session_state.selected.append(row.to_dict())
-            st.success(f"Selected {icon} {row['Label']}")
+            st.success(f"Selected {row['Label']}")
 
 # ======================== CANVAS ========================
 c1, c2 = st.columns([4,1])
@@ -117,45 +114,46 @@ with c1:
     st.subheader("Link Analysis Canvas")
 
     if st.session_state.selected:
-        preview = ", ".join([f"{ENTITY_STYLES[e['Type']]['icon']} {e['Label']}" for e in st.session_state.selected[:6]])
+        preview = ", ".join([e["Label"] for e in st.session_state.selected[:6]])
         st.info(f"Ready to drop: {preview}")
-        if st.button("Drop All Selected → Canvas", type="primary"):
+        if st.button("Drop All → Canvas", type="primary"):
             for ent in st.session_state.selected:
                 if ent not in st.session_state.graph_entities:
                     st.session_state.graph_entities.append(ent)
             st.session_state.selected = []
             st.rerun()
 
-    # Build network
+    # Build network with REAL ICONS on canvas
     net = Network(height="800px", bgcolor="#0e1117", font_color="#ffffff", directed=True, notebook=True)
     net.force_atlas_2based()
 
-    # Add nodes with proper icons + safe tooltip
     for ent in st.session_state.graph_entities:
         label = ent["Label"]
-        style = ENTITY_STYLES[ent["Type"]]
-        photo = ent.get("PhotoURL", "").strip()
+        icon_url = ICON_URLS[ent["Type"]]
 
-        # Safe tooltip
+        # Tooltip
         details = []
         for k, v in ent["Data"].items():
-            if v in [None, "", date(1,1,1)]: 
-                continue
-            if isinstance(v, date):
-                v = v.strftime("%Y-%m-%d")
+            if v in [None, "", date(1,1,1)]: continue
+            if isinstance(v, date): v = v.strftime("%Y-%m-%d")
             details.append(f"{k}: {v}")
         tooltip = f"<b>{label}</b><br>{ent['Type']}<br>" + "<br>".join(details)
 
-        if photo:
-            net.add_node(label, shape="circularImage", image=photo, title=tooltip)
-        else:
-            net.add_node(label, color=style["color"], title=tooltip, size=30)
+        # Use icon as node image
+        net.add_node(
+            label,
+            shape="image",
+            image=icon_url,
+            title=tooltip,
+            size=40,
+            labelHighlightBold=True
+        )
 
-    # Add links
+    # Links
     for link in st.session_state.graph_links:
-        net.add_edge(link["source"], link["target"], label=link.get("type", ""), color="#bdc3c7", arrows="to")
+        net.add_edge(link["source"], link["target"], label=link.get("type", ""), color="#bdc3c7", arrows="to", width=3)
 
-    # Render safely
+    # Render
     components.html(net.generate_html(), height=800, scrolling=True)
 
     # Link creator
@@ -164,31 +162,25 @@ with c1:
         nodes = [e["Label"] for e in st.session_state.graph_entities]
         src = st.selectbox("From", nodes, key="from")
         tgt = st.selectbox("To", nodes, key="to")
-        link_type = st.text_input("Link Type (e.g. Calls, Owns, Lives At)", "Calls", key="lt")
+        link_type = st.text_input("Link Type", "Calls / Owns / Lives At", key="lt")
         if st.button("Create Link", type="primary"):
             st.session_state.graph_links.append({"source": src, "target": tgt, "type": link_type})
-            st.success(f"Linked {src} → {tgt}")
+            st.success("Link created")
             st.rerun()
 
 with c2:
     st.subheader("On Canvas")
-    st.write(f"**{len(st.session_state.graph_entities)} entities**")
     for ent in st.session_state.graph_entities:
-        icon = ENTITY_STYLES[ent["Type"]]["icon"]
-        if st.button(f"{icon} {ent['Label']}", key=f"rem_{ent['ID']}"):
+        if st.button(f"Remove {ent['Label']}", key=f"rem_{ent['ID']}"):
             st.session_state.graph_entities = [e for e in st.session_state.graph_entities if e["ID"] != ent["ID"]]
             st.rerun()
 
 # Export
-with st.expander("Export Canvas"):
+with st.expander("Export"):
     if st.session_state.graph_entities:
-        export_entities = []
-        for e in st.session_state.graph_entities:
-            row = {"Label": e["Label"], "Type": e["Type"]}
-            row.update(e["Data"])
-            export_entities.append(row)
-        df_e = pd.DataFrame(export_entities)
-        st.download_button("Download Entities CSV", df_e.to_csv(index=False), "entities.csv")
+        export = [{"Label": e["Label"], "Type": e["Type"], **e["Data"]} for e in st.session_state.graph_entities]
+        df = pd.DataFrame(export)
+        st.download_button("Download Entities CSV", df.to_csv(index=False), "entities.csv")
     if st.session_state.graph_links:
         df_l = pd.DataFrame(st.session_state.graph_links)
         st.download_button("Download Links CSV", df_l.to_csv(index=False), "links.csv")
