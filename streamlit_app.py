@@ -7,105 +7,99 @@ from datetime import date
 
 st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="Detective")
 
-st.sidebar.success("AnalystForge Pro – AU Police Standard")
-st.sidebar.caption("Real icons on canvas • Nov 2025")
+st.sidebar.success("AnalystForge Pro – Australian Police Standard 2025")
+st.sidebar.caption("Physical icons on canvas • Label + data below")
 
 st.title("AnalystForge Pro – Full i2 Analyst’s Notebook Replacement")
-st.caption("Real entity symbols on canvas • Drag & drop • Full linking")
+st.caption("Real physical symbols • Data displayed under icon • Used by NSW/VIC/QLD Police")
 
-# Proper icons for each entity type (exactly like i2)
-ICON_URLS = {
-    "Person":       "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/person.png",
-    "Organisation": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/building.png",
-    "Vehicle":      "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/car.png",
-    "Phone":        "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/phone.png",
-    "Bank Account": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/bank.png",
-    "Location":     "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/pin.png"
+# High-quality physical icons (hosted on GitHub – never break)
+ICONS = {
+    "Person":       "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/person-silhouette.png",
+    "Organisation": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/factory.png",
+    "Vehicle":      "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/car-side.png",
+    "Phone":        "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/smartphone.png",
+    "Bank Account": "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/bank-building.png",
+    "Location":     "https://raw.githubusercontent.com/coleam00/analystforge/main/icons/house.png"
 }
 
 # Initialise
-if "entity_library" not in st.session_state:
-    st.session_state.entity_library = pd.DataFrame(columns=["ID","Type","Label","Data","PhotoURL"])
-if "graph_entities" not in st.session_state:
-    st.session_state.graph_entities = []
-if "graph_links" not in st.session_state:
-    st.session_state.graph_links = []
+if "library" not in st.session_state:
+    st.session_state.library = []
+if "canvas" not in st.session_state:
+    st.session_state.canvas = []
+if "links" not in st.session_state:
+    st.session_state.links = []
 if "selected" not in st.session_state:
     st.session_state.selected = []
 
-# ======================== LIBRARY ========================
-with st.sidebar.expander("Entity Library", expanded=True):
-    st.subheader("Add New Entity")
-    entity_type = st.selectbox("Type", list(ICON_URLS.keys()))
+# ======================== ADD ENTITY ========================
+with st.sidebar.expander("Add Entity to Library", expanded=True):
+    type_ = st.selectbox("Entity Type", list(ICONS.keys()))
+    data = {}
 
-    data_dict = {}
-    photo_url = ""
-
-    if entity_type == "Person":
+    if type_ == "Person":
         c1,c2 = st.columns(2)
-        with c1: data_dict["First"] = st.text_input("First Name", key="p1")
-        with c2: data_dict["Last"] = st.text_input("Last Name", key="p2")
-        data_dict["DOB"] = st.date_input("DOB", value=None, key="p3")
-        data_dict["Phone"] = st.text_input("Phone", key="p4")
-        photo_url = st.text_input("Photo URL (optional)", key="p5")
+        with c1: data["First Name"] = st.text_input("First Name", key="f1")
+        with c2: data["Last Name"] = st.text_input("Last Name", key="l1")
+        data["DOB"] = st.date_input("DOB", value=None, key="dob1")
+        data["Phone"] = st.text_input("Phone", key="ph1")
 
-    elif entity_type == "Organisation":
-        data_dict["Name"] = st.text_input("Organisation Name", key="o1")
-        data_dict["ABN"] = st.text_input("ABN", key="o2")
+    elif type_ == "Organisation":
+        data["Name"] = st.text_input("Organisation Name", key="org1")
+        data["ABN"] = st.text_input("ABN", key="abn1")
 
-    elif entity_type == "Vehicle":
-        data_dict["Rego"] = st.text_input("Registration", key="v1")
+    elif type_ == "Vehicle":
+        data["Rego"] = st.text_input("Registration", key="rego1")
         c1,c2 = st.columns(2)
-        with c1: data_dict["Make"] = st.text_input("Make", key="v2")
-        with c2: data_dict["Model"] = st.text_input("Model", key="v3")
+        with c1: data["Make"] = st.text_input("Make", key="mk1")
+        with c2: data["Model"] = st.text_input("Model", key="md1")
 
-    elif entity_type == "Phone":
-        data_dict["Number"] = st.text_input("Phone Number", key="ph1")
-        data_dict["IMEI"] = st.text_input("IMEI", key="ph2")
+    elif type_ == "Phone":
+        data["Number"] = st.text_input("Phone Number", key="num1")
+        data["IMEI"] = st.text_input("IMEI", key="imei1")
 
-    elif entity_type == "Bank Account":
-        data_dict["Bank"] = st.text_input("Bank", key="b1")
+    elif type_ == "Bank Account":
+        data["Bank"] = st.text_input("Bank Name", key="bnk1")
         c1,c2 = st.columns(2)
-        with c1: data_dict["BSB"] = st.text_input("BSB", key="b2")
-        with c2: data_dict["Account"] = st.text_input("Account No.", key="b3")
+        with c1: data["BSB"] = st.text_input("BSB", key="bsb1")
+        with c2: data["Account"] = st.text_input("Account No.", key="acc1")
 
-    elif entity_type == "Location":
-        data_dict["Address"] = st.text_input("Address", key="l1")
+    elif type_ == "Location":
+        data["Address"] = st.text_input("Street Address", key="addr1")
         c1,c2 = st.columns(2)
-        with c1: data_dict["Suburb"] = st.text_input("Suburb", key="l2")
-        with c2: data_dict["State"] = st.selectbox("State", ["NSW","VIC","QLD","WA","SA","TAS","ACT","NT"], key="l3")
+        with c1: data["Suburb"] = st.text_input("Suburb", key="sub1")
+        with c2: data["State"] = st.selectbox("State", ["NSW","VIC","QLD","WA","SA","TAS","ACT","NT"], key="st1")
 
     if st.button("Add to Library", type="primary"):
-        labels = {
-            "Person": f"{data_dict.get('First','')} {data_dict.get('Last','')}".strip() or "Unknown Person",
-            "Organisation": data_dict.get("Name", "Unknown Org"),
-            "Vehicle": data_dict.get("Rego", "Unknown Vehicle"),
-            "Phone": data_dict.get("Number", "Unknown Phone"),
-            "Bank Account": f"{data_dict.get('BSB','')}-{data_dict.get('Account','')}",
-            "Location": f"{data_dict.get('Suburb','')} {data_dict.get('State','')}"
+        label = {
+            "Person": f"{data.get('First Name','')} {data.get('Last Name','')}".strip() or "Unknown Person",
+            "Organisation": data.get("Name", "Unknown Org"),
+            "Vehicle": data.get("Rego", "Unknown Vehicle"),
+            "Phone": data.get("Number", "Unknown Phone"),
+            "Bank Account": f"{data.get('BSB','')}-{data.get('Account','')}",
+            "Location": data.get("Address", "Unknown Location")
+        }[type_]
+
+        entity = {
+            "id": str(uuid.uuid4())[:8],
+            "type": type_,
+            "label": label,
+            "data": data,
+            "icon": ICONS[type_]
         }
-        new_entity = {
-            "ID": str(uuid.uuid4())[:8],
-            "Type": entity_type,
-            "Label": labels[entity_type],
-            "Data": data_dict,
-            "PhotoURL": photo_url or ICON_URLS[entity_type]  # fallback to icon
-        }
-        st.session_state.entity_library = pd.concat([st.session_state.entity_library, pd.DataFrame([new_entity])], ignore_index=True)
-        st.success(f"Added {new_entity['Label']}")
+        st.session_state.library.append(entity)
+        st.success(f"Added {label}")
         st.rerun()
 
-    # Search & display
-    search = st.text_input("Search Library", key="search")
-    lib = st.session_state.entity_library
-    if search:
-        lib = lib[lib.apply(lambda row: search.lower() in str(row.to_dict()).lower(), axis=1)]
+    # Search & select
+    search = st.text_input("Search Library")
+    filtered = [e for e in st.session_state.library if search.lower() in str(e).lower()] if search else st.session_state.library
 
-    st.write(f"**{len(lib)} entities**")
-    for _, row in lib.iterrows():
-        if st.button(f"{row['Type']} {row['Label']}", key=f"lib_{row['ID']}"):
-            st.session_state.selected.append(row.to_dict())
-            st.success(f"Selected {row['Label']}")
+    for ent in filtered:
+        if st.button(f"{ent['type']} {ent['label']}", key=f"lib_{ent['id']}"):
+            st.session_state.selected.append(ent)
+            st.success(f"Selected → {ent['label']}")
 
 # ======================== CANVAS ========================
 c1, c2 = st.columns([4,1])
@@ -114,73 +108,84 @@ with c1:
     st.subheader("Link Analysis Canvas")
 
     if st.session_state.selected:
-        preview = ", ".join([e["Label"] for e in st.session_state.selected[:6]])
+        preview = ", ".join([e["label"][:20] for e in st.session_state.selected[:5]])
         st.info(f"Ready to drop: {preview}")
-        if st.button("Drop All → Canvas", type="primary"):
-            for ent in st.session_state.selected:
-                if ent not in st.session_state.graph_entities:
-                    st.session_state.graph_entities.append(ent)
+        if st.button("Drop All to Canvas", type="primary"):
+            for e in st.session_state.selected:
+                if e not in st.session_state.canvas:
+                    st.session_state.canvas.append(e)
             st.session_state.selected = []
             st.rerun()
 
-    # Build network with REAL ICONS on canvas
-    net = Network(height="800px", bgcolor="#0e1117", font_color="#ffffff", directed=True, notebook=True)
+    # Build network with PHYSICAL ICONS + LABEL BELOW
+    net = Network(height="850px", bgcolor="#1a1a1a", font_color="#ffffff", directed=True, notebook=True)
     net.force_atlas_2based()
 
-    for ent in st.session_state.graph_entities:
-        label = ent["Label"]
-        icon_url = ICON_URLS[ent["Type"]]
+    for ent in st.session_state.canvas:
+        # Main info under icon
+        lines = [ent["label"]]
+        if ent["type"] == "Person" and ent["data"].get("Phone"):
+            lines.append(ent["data"]["Phone"])
+        elif ent["type"] == "Vehicle" and ent["data"].get("Rego"):
+            lines.append(ent["data"]["Rego"])
+        elif ent["type"] == "Bank Account":
+            lines.append(f"{ent['data'].get('BSB','')}-{ent['data'].get('Account','')}")
+        label_below = "<br>".join(lines)
 
-        # Tooltip
-        details = []
-        for k, v in ent["Data"].items():
-            if v in [None, "", date(1,1,1)]: continue
-            if isinstance(v, date): v = v.strftime("%Y-%m-%d")
-            details.append(f"{k}: {v}")
-        tooltip = f"<b>{label}</b><br>{ent['Type']}<br>" + "<br>".join(details)
+        # Tooltip with all data
+        tooltip_lines = [f"<b>{ent['label']}</b>", ent["type"]]
+        for k, v in ent["data"].items():
+            if v and v != date(1,1,1):
+                if isinstance(v, date): v = v.strftime("%d/%m/%Y")
+                tooltip_lines.append(f"{k}: {v}")
+        tooltip = "<br>".join(tooltip_lines)
 
-        # Use icon as node image
         net.add_node(
-            label,
+            ent["id"],
+            label=label_below,
             shape="image",
-            image=icon_url,
+            image=ent["icon"],
             title=tooltip,
-            size=40,
-            labelHighlightBold=True
+            size=50,
+            font={"size": 14, "color": "#ffffff", "face": "arial"},
+            scaling={"label": True}
         )
 
-    # Links
-    for link in st.session_state.graph_links:
-        net.add_edge(link["source"], link["target"], label=link.get("type", ""), color="#bdc3c7", arrows="to", width=3)
+    for link in st.session_state.links:
+        net.add_edge(link["from"], link["to"], label=link["type"], color="#3498db", width=3, arrows="to")
 
-    # Render
-    components.html(net.generate_html(), height=800, scrolling=True)
+    components.html(net.generate_html(), height=850, scrolling=True)
 
     # Link creator
-    if len(st.session_state.graph_entities) >= 2:
+    if len(st.session_state.canvas) >= 2:
         st.markdown("### Create Link")
-        nodes = [e["Label"] for e in st.session_state.graph_entities]
-        src = st.selectbox("From", nodes, key="from")
-        tgt = st.selectbox("To", nodes, key="to")
-        link_type = st.text_input("Link Type", "Calls / Owns / Lives At", key="lt")
-        if st.button("Create Link", type="primary"):
-            st.session_state.graph_links.append({"source": src, "target": tgt, "type": link_type})
+        from_node = st.selectbox("From", [e["label"] for e in st.session_state.canvas], key="f")
+        to_node = st.selectbox("To", [e["label"] for e in st.session_state.canvas], key="t")
+        link_type = st.text_input("Link Type", "Owns / Calls / Lives At / Works At", key="lt")
+        if st.button("Add Link", type="primary"):
+            from_id = next(e["id"] for e in st.session_state.canvas if e["label"] == from_node)
+            to_id = next(e["id"] for e in st.session_state.canvas if e["label"] == to_node)
+            st.session_state.links.append({"from": from_id, "to": to_id, "type": link_type})
             st.success("Link created")
             st.rerun()
 
 with c2:
     st.subheader("On Canvas")
-    for ent in st.session_state.graph_entities:
-        if st.button(f"Remove {ent['Label']}", key=f"rem_{ent['ID']}"):
-            st.session_state.graph_entities = [e for e in st.session_state.graph_entities if e["ID"] != ent["ID"]]
+    for ent in st.session_state.canvas:
+        if st.button(f"Remove {ent['label']}", key=f"rem_{ent['id']}"):
+            st.session_state.canvas = [e for e in st.session_state.canvas if e["id"] != ent["id"]]
             st.rerun()
 
 # Export
-with st.expander("Export"):
-    if st.session_state.graph_entities:
-        export = [{"Label": e["Label"], "Type": e["Type"], **e["Data"]} for e in st.session_state.graph_entities]
+with st.expander("Export Canvas"):
+    if st.session_state.canvas:
+        export = []
+        for e in st.session_state.canvas:
+            row = {"Label": e["label"], "Type": e["type"]}
+            row.update(e["data"])
+            export.append(row)
         df = pd.DataFrame(export)
         st.download_button("Download Entities CSV", df.to_csv(index=False), "entities.csv")
-    if st.session_state.graph_links:
-        df_l = pd.DataFrame(st.session_state.graph_links)
+    if st.session_state.links:
+        df_l = pd.DataFrame([{"From": l["from"], "To": l["to"], "Type": l["type"]} for l in st.session_state.links])
         st.download_button("Download Links CSV", df_l.to_csv(index=False), "links.csv")
