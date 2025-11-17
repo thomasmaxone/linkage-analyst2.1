@@ -9,26 +9,27 @@ import base64
 import os
 import yaml
 from yaml.loader import SafeLoader
+import plotly.express as px
 
-# ------------------- CONFIG & AUTH (optional - remove if you don't want login) -------------------
+# ------------------- CONFIG & AUTH -------------------
 st.set_page_config(page_title="AnalystForge", layout="wide", page_icon="🕵️")
 
-# Create default credentials if no config file
+# Create default config if not exists
 if not os.path.exists('config.yaml'):
     config = {
         'credentials': {
             'usernames': {
                 'investigator': {
                     'name': 'Investigator',
-                    'password': '$2b$12$EixZaYVK1fsbw1ZfbX3OXe.jBkL5wnrXdvv7f3zYFG5qw3R5iY8CC'  # password = "analyst2025"
+                    'password': '$2b$12$EixZaYVK1fsbw1ZfbX3OXe.jBkL5wnrXdvv7f3zYFG5qw3R5iY8CC'  # password: analyst2025
                 }
             }
         },
-        'cookie': {'expiry_days': 30, 'key': 'random_key', 'name': 'analystforge_cookie'},
+        'cookie': {'expiry_days': 30, 'key': 'analystforge_key_2025', 'name': 'analystforge_cookie'},
         'preauthorized': ['demo@analystforge.org']
     }
-    with open('config.yaml', 'w') as file:
-        yaml.dump(config, file, default_flow_style=False)
+    with open('config.yaml', 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
 
 with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -42,18 +43,19 @@ authenticator = stauth.Authenticate(
 
 name, authentication_status, username = authenticator.login('Login to AnalystForge', 'main')
 
-if authentication_status == False:
-    st.error('Username/password is incorrect')
-    st.stop()
-if authentication_status == None:
-    st.warning('Please enter your username and password (try investigator / analyst2025)')
+if not authentication_status:
+    if authentication_status is False:
+        st.error('Username/password incorrect')
+    else:
+        st.warning('Please enter credentials (try: investigator / analyst2025)')
     st.stop()
 
 # ------------------- MAIN APP -------------------
-st.sidebar.image("https://i.imgur.com/0J7g9Zk.png", width=200)  # AnalystForge logo
-st.title("🕵️ AnalystForge – Open-Source Analyst’s Notebook (v10 Theme)")
+st.title("🕵️ AnalystForge – Open-Source Analyst’s Notebook Clone")
+st.sidebar.success(f"Logged in as {name}")
+authenticator.logout('Logout', 'sidebar')
 
-# Session state
+# Initialize session state
 if 'entities' not in st.session_state:
     st.session_state.entities = pd.DataFrame(columns=["ID", "Label", "Type", "PhotoURL", "Notes"])
 if 'links' not in st.session_state:
@@ -63,107 +65,90 @@ tab1, tab2, tab3, tab4 = st.tabs(["Import Data", "Link Chart", "Timeline", "Expo
 
 with tab1:
     st.header("Import Entities & Links")
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         ent_file = st.file_uploader("Entities CSV", type=["csv"])
         if ent_file:
             st.session_state.entities = pd.read_csv(ent_file)
             st.success(f"Loaded {len(st.session_state.entities)} entities")
-    with col2:
+    with c2:
         link_file = st.file_uploader("Links CSV", type=["csv"])
         if link_file:
             st.session_state.links = pd.read_csv(link_file)
             st.success(f"Loaded {len(st.session_state.links)} links")
 
-    st.info("Required columns → Entities: Label, Type (Person/Phone/Vehicle/etc), PhotoURL (optional)\nLinks: Source, Target, Type (Call/Meets/Transfer)")
+    st.info("""
+    **Entities CSV columns**: `Label`, `Type` (Person/Phone/Vehicle/Location/etc), `PhotoURL` (optional), `Notes` (optional)  
+    **Links CSV columns**: `Source`, `Target`, `Type` (Call/Meets/Transfer), `Date` (optional)
+    """)
 
 with tab2:
-    st.header("Interactive Link Chart (Analyst’s Notebook Style)")
+    st.header("Interactive Link Chart")
+    if st.session_state.entities.empty:
+        st.warning("Upload entities first")
+    else:
+        net = Network(height="800px", bgcolor="#0e1117", font_color="#ffffff", directed=True)
+        net.force_atlas_2based()
 
-    if not st.session_state.entities.empty:
-        net = Network(height="800px", bgcolor="#0e1117", font_color="#ffffff", directed=True, notebook=True)
-        net.set_options("""
-        var options = {
-          "physics": {
-            "enabled": true,
-            "barnesHut": {
-              "gravitationalConstant": -8000,
-              "springLength": 250,
-              "springStrength": 0.04
-            }
-          },
-          "edges": {
-            "arrows": "to",
-            "smooth": false,
-            "color": "#666666"
-          },
-          "nodes": {
-            "font": {"size": 16, "face": "tahoma"},
-            "borderWidth": 2
-          }
-        }
-        """)
-
-        # Entity type → color & shape (exact ANB style)
-        type_style = {
-            "Person": {"color": "#ff4444", "shape": "dot"},
-            "Phone": {"color": "#00C851", "shape": "square"},
-            "Vehicle": {"color": "#33b5e5", "shape": "triangle"},
-            "Location": {"color": "#ffbb33", "shape": "diamond"},
-            "Account": {"color": "#9c27b0", "shape": "box"},
-            "Email": {"color": "#00bcd4", "shape": "ellipse"},
-            "default": {"color": "#888888", "shape": "dot"}
+        # Analyst's Notebook style colors
+        colors = {
+            "Person": "#ff4444", "Phone": "#00C851", "Vehicle": "#33b5e5",
+            "Location": "#ffbb33", "Account": "#9c27b0", "Email": "#00bcd4",
+            "Organization": "#aa66cc", "default": "#888888"
         }
 
         for _, row in st.session_state.entities.iterrows():
-            label = row.get("Label", row.get("ID", "Unknown"))
+            label = str(row.get("Label") or row.get("ID", "Unknown"))
             ent_type = row.get("Type", "default")
-            style = type_style.get(ent_type, type_style["default"])
+            color = colors.get(ent_type, colors["default"])
             photo = row.get("PhotoURL", "")
-            title = row.get("Notes", "")
-            if photo:
-                net.add_node(label, label=label, title=f"<img src='{photo}' width='200px'><br>{title}", 
-                            shape="image", image=photo, **style, size=40)
+            notes = row.get("Notes", "")
+            title = f"<b>{label}</b><br>{ent_type}<br>{notes}"
+
+            if photo and photo.strip():
+                net.add_node(label, title=title, shape="circularImage", image=photo, brokenImage="https://via.placeholder.com/50")
             else:
-                net.add_node(label, label=label, title=title, **style, size=35)
+                net.add_node(label, title=title, color=color, size=30)
 
         for _, row in st.session_state.links.iterrows():
-            src = row["Source"]
-            tgt = row["Target"]
+            src = str(row["Source"])
+            tgt = str(row["Target"])
             link_type = row.get("Type", "Link")
-            color = {"Call": "#00ff00", "Transfer": "#ff9800", "Meets": "#ff4444"}.get(link_type, "#666666")
-            net.add_edge(src, tgt, title=link_type, label=link_type, color=color, width=3)
+            net.add_edge(src, tgt, label=link_type, color="#666666", width=2, arrows="to")
 
-        net.show("analystforge.html")
-        components.html(open("analystforge.html", "r", encoding="utf-8").read(), height=800)
-    else:
-        st.warning("Upload entities first")
+        net.show("chart.html")
+        with open("chart.html", "r", encoding="utf-8") as f:
+            components.html(f.read(), height=800, scrolling=True)
 
 with tab3:
-    st.header("Timeline View")
+    st.header("Timeline")
     if not st.session_state.links.empty and "Date" in st.session_state.links.columns:
-        timeline_df = st.session_state.links[["Source", "Target", "Type", "Date"]].copy()
-        timeline_df["Date"] = pd.to_datetime(timeline_df["Date"])
-        fig = px.timeline(timeline_df, x_start="Date", x_end="Date", y="Type", color="Type", text="Source → Target")
-        fig.update_layout(template="plotly_dark", height=600)
-        st.plotly_chart(fig, use_container_width=True)
+        df = st.session_state.links.copy()
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df.dropna(subset=["Date"])
+        if not df.empty:
+            fig = px.timeline(df, x_start="Date", x_end="Date", y="Type", color="Type",
+                              text=df["Source"] + " → " + df["Target"], title="Event Timeline")
+            fig.update_layout(template="plotly_dark")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No valid dates found")
     else:
-        st.info("Add links with a 'Date' column to see timeline")
+        st.info("Add a 'Date' column (YYYY-MM-DD) to your links CSV")
 
 with tab4:
-    st.header("Export")
-    col1, col2 = st.columns(2)
-    with col1:
-        csv_ent = st.session_state.entities.to_csv(index=False)
-        b64 = base64.b64encode(csv_ent.encode()).decode()
-        href = f'<a href="data:file/csv;base64,{b64}' download="entities.csv">Download Entities CSV</a>'
-        st.markdown(href, unsafe_allow_html=True)
-    with col2:
-        csv_link = st.session_state.links.to_csv(index=False)
-        b64 = base64.b64encode(csv_link.encode()).decode()
-        href = f'<a href="data:file/csv;base64,{b64}' download="links.csv">Download Links CSV</a>'
-        st.markdown(href, unsafe_allow_html=True)
+    st.header("Export Data")
+    if not st.session_state.entities.empty:
+        csv1 = st.session_state.entities.to_csv(index=False)
+        b641 = base64.b64encode(csv1.encode()).decode()
+        href1 = f'<a href="data:file/csv;base64,{b641}" download="entities.csv">Download Entities CSV</a>'
+        st.markdown(href1, unsafe_allow_html=True)
 
-# Logout
-authenticator.logout('Logout', 'sidebar')
-st.sidebar.success(f"Logged in as {name}")
+    if not st.session_state.links.empty:
+        csv2 = st.session_state.links.to_csv(index=False)
+        b642 = base64.b64encode(csv2.encode()).decode()
+        href2 = f'<a href="data:file/csv;base64,{b642}" download="links.csv">Download Links CSV</a>'
+        st.markdown(href2, unsafe_allow_html=True)
+
+    if st.session_state.entities.empty and st.session_state.links.empty:
+        st.info("Nothing to export yet")
