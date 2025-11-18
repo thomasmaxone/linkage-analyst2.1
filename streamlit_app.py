@@ -8,7 +8,7 @@ import random
 
 st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="Police")
 
-# BEAUTIFUL 2025 GLASS THEME
+# ========== BEAUTIFUL 2025 GLASS THEME ==========
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -33,12 +33,31 @@ ENTITIES = {
     "Location":     {"icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/house-fill.svg",        "color": "#f97316"}
 }
 
-# Init (removed "pending_link", as it's unused)
-for k in ["library", "canvas", "links", "selected_type"]:
-    if k not in st.session_state:
-        st.session_state[k] = [] if k not in ["selected_type"] else "Person"
+# ==== Helper: Entity field definitions per type ====
+def get_entity_fields(entity_type):
+    if entity_type == "Person":
+        return [("label", "Full Name"), ("Phone Number", "Phone Number"), ("DOB", "Date of Birth")]
+    if entity_type == "Vehicle":
+        return [("label", "Registration"), ("Type", "Vehicle Type"), ("Owner", "Owner")]
+    if entity_type == "Bank Account":
+        return [("label", "Account Name"), ("BSB", "BSB"), ("Account Number", "Account Number")]
+    if entity_type == "Organisation":
+        return [("label", "Organisation Name"), ("Type", "Type")]
+    if entity_type == "Phone":
+        return [("label", "Label"), ("Number", "Phone Number"), ("Provider", "Provider")]
+    if entity_type == "Location":
+        return [("label", "Label"), ("Address", "Address")]
+    return [("label", "Label")]
 
-# LEFT SIDEBAR — CHOOSE WHAT TO DROP
+# ==== State initialization ====
+for k in ["library", "canvas", "links", "selected_type", "adding_entity", "pending_entity_type", "pending_entity_coords"]:
+    if k not in st.session_state:
+        st.session_state[k] = [] if k in ["library", "canvas", "links"] else None if k in ["pending_entity_type", "pending_entity_coords"] else False if k == "adding_entity" else "Person"
+
+if "pending_style" not in st.session_state:
+    st.session_state.pending_style = {"color": "#6366f1", "width": 4, "dashes": False, "label": ""}
+
+# ==== LEFT SIDEBAR ====
 with st.sidebar:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### Drop Entity Type")
@@ -48,12 +67,16 @@ with st.sidebar:
         format_func=lambda x: x,
         index=list(ENTITIES.keys()).index(st.session_state.selected_type)
     )
-    st.markdown("Click anywhere on the white canvas to place")
+    if st.button("Add new entity to library"):
+        st.session_state.adding_entity = True
+        st.session_state.pending_entity_type = st.session_state.selected_type
+        st.session_state.pending_entity_coords = None  # Will be placed on canvas by drag/drop
+
+    st.markdown("Click on library entry to drop on random canvas position.")
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### Entity Library")
-    # NOTE: The library is empty by default; ensure you populate st.session_state.library somewhere!
     for e in st.session_state.library:
         if st.button(f"{e['type']} {e['label']}", key=f"lib_{e['id']}"):
             # Add copy to canvas at random position
@@ -64,14 +87,53 @@ with st.sidebar:
                 st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# CANVAS + RIGHT SIDEBAR
+# ===== ADD ENTITY FORM (Sidebar modal-like form) ====
+if st.session_state.adding_entity:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Enter Entity Information")
+    entity_fields = get_entity_fields(st.session_state.pending_entity_type)
+    entity_form = st.sidebar.form(key="entity_form")
+    entity_data = {}
+
+    for key, label in entity_fields:
+        if "date" in key.lower() or "dob" in key.lower():
+            val = entity_form.date_input(label, key=f"f_{key}", value=None)
+            entity_data[key] = str(val) if val else ""
+        else:
+            entity_data[key] = entity_form.text_input(label, key=f"f_{key}")
+
+    submit_entity = entity_form.form_submit_button("Save Entity")
+    cancel_entity = entity_form.form_submit_button("Cancel")
+
+    if submit_entity:
+        new_ent = {
+            "id": str(uuid.uuid4())[:8],
+            "type": st.session_state.pending_entity_type,
+            "label": entity_data.get("label", f"New {st.session_state.pending_entity_type}"),
+            "data": entity_data,
+            "icon": ENTITIES[st.session_state.pending_entity_type]["icon"],
+            "color": ENTITIES[st.session_state.pending_entity_type]["color"],
+            "x": random.randint(-300, 300),
+            "y": random.randint(-300, 300),
+            "fixed": False
+        }
+        st.session_state.library.append(new_ent)
+        st.session_state.adding_entity = False
+        st.session_state.pending_entity_type = None
+        st.session_state.pending_entity_coords = None
+        st.experimental_rerun()
+    if cancel_entity:
+        st.session_state.adding_entity = False
+        st.session_state.pending_entity_type = None
+        st.session_state.pending_entity_coords = None
+
+# ===== MAIN CANVAS AND RIGHT SIDEBAR =====
 col_canvas, col_right = st.columns([5, 1])
 
 with col_canvas:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### Canvas — Click to place • Click node → node to link")
 
-    # Pyvis network
     net = Network(height="920px", bgcolor="#ffffff", directed=True, notebook=True)
     net.set_options("""
     var options = {
@@ -82,7 +144,6 @@ with col_canvas:
     }
     """)
 
-    # Add nodes
     for ent in st.session_state.canvas:
         lines = [f"<b>{ent['label']}</b>"]
         if ent["type"] == "Person" and ent["data"].get("Phone Number"): lines.append(ent["data"]["Phone Number"])
@@ -91,8 +152,9 @@ with col_canvas:
         label_html = "<br>".join(lines)
 
         tooltip = "<br>".join([f"<b>{ent['label']}</b>"] +
-                             [f"{k}: {v if not isinstance(v,date) else v.strftime('%d/%m/%Y')}"
-                              for k,v in ent["data"].items() if v])
+            [f"{k}: {v if not isinstance(v,date) else v.strftime('%d/%m/%Y')}"
+            for k,v in ent["data"].items() if v]
+        )
 
         net.add_node(
             ent["id"],
@@ -105,7 +167,6 @@ with col_canvas:
             y=ent.get("y",0)
         )
 
-    # Add links
     for link in st.session_state.links:
         net.add_edge(
             link["from"], link["to"],
@@ -115,10 +176,8 @@ with col_canvas:
             dashes=link.get("dashes",False)
         )
 
-    # === MAGIC: CAPTURE CLICKS ON CANVAS ===
+    # ===== JS Node/Canvas Click Control (insert logic for node/canvas click) =====
     graph_html = net.generate_html()
-    # Inject JavaScript to capture node clicks and canvas clicks
-    # Fix: we set display:block/none for link_status overlay for visibility!
     graph_html = graph_html.replace(
         "</head>",
         """
@@ -167,7 +226,6 @@ with col_canvas:
         "<body>",
         f"<body><input type='hidden' id='selected_type' value='{st.session_state.selected_type}'>"
     )
-    # Fix: display: none by default; JS will set display: block when needed.
     graph_html = graph_html.replace(
         "</body>",
         "<div id='link_status' style='position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#10b981; color:white; padding:12px 24px; border-radius:12px; font-weight:600; z-index:1000; display:none;'></div></body>"
@@ -176,14 +234,14 @@ with col_canvas:
     components.html(graph_html, height=920, scrolling=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# RIGHT SIDEBAR — TINY LINK TOOLBAR
+# ==== RIGHT SIDEBAR: LINK STYLES AND CONNECT NODES ====
 with col_right:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### Link Style")
-    link_color = st.color_picker("Color", "#6366f1")
-    link_width = st.slider("Thickness", 1, 12, 4)
-    link_dashed = st.checkbox("Dashed line")
-    link_label = st.text_input("Label (optional)")
+    link_color = st.color_picker("Color", st.session_state.pending_style.get("color", "#6366f1"))
+    link_width = st.slider("Thickness", 1, 12, st.session_state.pending_style.get("width", 4))
+    link_dashed = st.checkbox("Dashed line", value=st.session_state.pending_style.get("dashes", False))
+    link_label = st.text_input("Label (optional)", value=st.session_state.pending_style.get("label", ""))
 
     if st.button("Apply to Next Link"):
         st.session_state.pending_style = {
@@ -195,26 +253,48 @@ with col_right:
         st.success("Style saved")
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # ==== Connect two nodes sidebar ====
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### On Canvas")
-    for ent in st.session_state.canvas[:10]:  # show recent
-        st.markdown(f"**{ent['type']}** {ent['label'][:20]}")
-    if len(st.session_state.canvas) > 10:
-        st.caption(f"... and {len(st.session_state.canvas)-10} more")
+    st.markdown("### Connect Entities")
+    if len(st.session_state.canvas) >= 2:
+        node_list = [(f"{e['type']} {e['label']}", e["id"]) for e in st.session_state.canvas]
+        node_id_map = {e["id"]: f"{e['type']} {e['label']}" for e in st.session_state.canvas}
+        from_idx = st.selectbox("From node", node_list, index=0, key="from_node_select")
+        to_idx = st.selectbox("To node", node_list, index=1, key="to_node_select")
+
+        if st.button("Create Link (from right panel)"):
+            st.session_state.links.append({
+                "from": from_idx[1],
+                "to": to_idx[1],
+                "color": link_color,
+                "width": link_width,
+                "dashes": link_dashed,
+                "label": link_label,
+            })
+            st.success("Link created!")
+            st.experimental_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# HIDDEN ENDPOINTS FOR JS CALLS
-# -- Workaround for Streamlit versions and "query params" --
-try:  # modern
+    # ==== Recently on canvas ====
+    st.markdown("<div class='glass'>", unsafe_allow_html=True)
+    st.markdown("### On Canvas")
+    for ent in st.session_state.canvas[:10]:
+        st.markdown(f"**{ent['type']}** {ent['label'][:20]}")
+    if len(st.session_state.canvas) > 10:
+        st.caption(f"... and {len(st.session_state.canvas) - 10} more")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ===== HIDDEN ENDPOINTS for JS CALLS (simulate Streamlit reactivity for JS events) =====
+try:
     query_params = st.query_params
-except AttributeError:  # legacy
+except AttributeError:
     query_params = st.experimental_get_query_params()
 
 def getparam(key, as_type=str):
     val = query_params.get(key)
     if val is None:
         return None
-    if isinstance(val, list):  # old Streamlit: value is always a list
+    if isinstance(val, list):
         val = val[0]
     return as_type(val)
 
@@ -222,20 +302,24 @@ if getparam("place"):
     x = int(getparam("x"))
     y = int(getparam("y"))
     typ = getparam("type")
-    # create new entity directly on canvas
-    data = {"Created": "Canvas drop"}
-    label = f"New {typ.lower()}"
-    new_ent = {
-        "id": str(uuid.uuid4())[:8],
-        "type": typ,
-        "label": label,
-        "data": data,
-        "icon": ENTITIES[typ]["icon"],
-        "color": ENTITIES[typ]["color"],
-        "x": x, "y": y, "fixed": False
-    }
-    st.session_state.canvas.append(new_ent)
-    st.rerun()
+    # Open entity info form if possible
+    st.session_state.adding_entity = True
+    st.session_state.pending_entity_type = typ
+    st.session_state.pending_entity_coords = (x, y)
+    st.experimental_rerun()
+
+# Post-form, for canvas drop assign position
+if (not st.session_state.adding_entity and 
+    st.session_state.pending_entity_coords is not None and 
+    len(st.session_state.library) > 0 
+):
+    last_entity = st.session_state.library[-1].copy()
+    last_entity["x"], last_entity["y"] = st.session_state.pending_entity_coords
+    last_entity["fixed"] = False
+    if last_entity not in st.session_state.canvas:
+        st.session_state.canvas.append(last_entity)
+    st.session_state.pending_entity_coords = None
+    st.experimental_rerun()
 
 if getparam("link"):
     from_id = getparam("from")
