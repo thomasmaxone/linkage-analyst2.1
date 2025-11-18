@@ -7,7 +7,7 @@ from datetime import date
 
 st.set_page_config(page_title="AnalystForge Pro", layout="wide", page_icon="Detective")
 
-# ULTRA-MODERN GLASS THEME
+# MODERN GLASS THEME
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -43,85 +43,73 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1>AnalystForge Pro</h1>", unsafe_allow_html=True)
-st.caption("Australian Law Enforcement Standard • 2025")
+st.caption("Australian Law Enforcement • Full i2 Replacement • 2025–2026")
 
-ICONS = {
-    "Person":       "https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg",
-    "Organisation": "https://raw.githubusercontent.com/twbs/icons/main/icons/building-fill.svg",
-    "Vehicle":      "https://raw.githubusercontent.com/twbs/icons/main/icons/truck.svg",
-    "Phone":        "https://raw.githubusercontent.com/twbs/icons/main/icons/phone-fill.svg",
-    "Bank Account": "https://raw.githubusercontent.com/twbs/icons/main/icons/piggy-bank-fill.svg",
-    "Location":     "https://raw.githubusercontent.com/twbs/icons/main/icons/house-fill.svg"
+# ENTITY COLORS & ICONS
+ENTITY_CONFIG = {
+    "Person":       {"color": "#ef4444", "icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg"},
+    "Organisation": {"color": "#8b5cf6", "icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/building-fill.svg"},
+    "Vehicle":      {"color": "#3b82f6", "icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/truck.svg"},
+    "Phone":        {"color": "#10b981", "icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/phone-fill.svg"},
+    "Bank Account": {"color": "#f59e0b", "icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/piggy-bank-fill.svg"},
+    "Location":     {"color": "#f97316", "icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/house-fill.svg"}
 }
 
-# Initialise
-for key in ["library", "canvas", "links", "form_counter"]:
-    if key not in st.session_state:
-        st.session_state[key] = [] if key != "form_counter" else 0
+# Init
+for k in ["library", "canvas", "links", "form_counter"]:
+    if k not in st.session_state:
+        st.session_state[k] = [] if k != "form_counter" else 0
 
-# SIDEBAR — DYNAMIC FORM
+# SIDEBAR — ADD ENTITY TO LIBRARY
 with st.sidebar:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Add New Entity")
+    st.markdown("### 1. Add Entity to Library")
 
-    entity_type = st.selectbox(
-        "Entity Type",
-        options=list(ICONS.keys()),
-        key=f"etype_{st.session_state.form_counter}"
-    )
+    entity_type = st.selectbox("Type", list(ENTITY_CONFIG.keys()), key=f"type_{st.session_state.form_counter}")
 
     with st.form(key=f"form_{st.session_state.form_counter}", clear_on_submit=True):
         data = {}
-
         if entity_type == "Person":
-            st.subheader("Person Details")
             c1,c2 = st.columns(2)
-            with c1: data["First Name"] = st.text_input("First Name")
-            with c2: data["Last Name"] = st.text_input("Last Name")
-            data["Date of Birth"] = st.date_input("DOB", value=None)
-            data["Address"] = st.text_input("Residential Address")
-            data["Phone Number"] = st.text_input("Phone Number")
+            with c1: data["First"] = st.text_input("First Name")
+            with c2: data["Last"] = st.text_input("Last Name")
+            data["DOB"] = st.date_input("DOB", value=None)
+            data["Phone"] = st.text_input("Phone")
+            data["Address"] = st.text_input("Address")
 
         elif entity_type == "Organisation":
-            st.subheader("Organisation Details")
-            data["Company Name"] = st.text_input("Company Name")
-            data["ABN/ACN"] = st.text_input("ABN or ACN")
-            data["Address"] = st.text_input("Registered Address")
+            data["Name"] = st.text_input("Company Name")
+            data["ABN"] = st.text_input("ABN/ACN")
+            data["Address"] = st.text_input("Address")
 
         elif entity_type == "Vehicle":
-            st.subheader("Vehicle Details")
-            data["Registration"] = st.text_input("Registration Plate")
+            data["Rego"] = st.text_input("Registration")
             c1,c2 = st.columns(2)
             with c1: data["Make"] = st.text_input("Make")
             with c2: data["Model"] = st.text_input("Model")
-            data["Colour"] = st.text_input("Colour")
 
         elif entity_type == "Phone":
-            st.subheader("Phone Details")
-            data["Phone Number"] = st.text_input("Phone Number")
+            data["Number"] = st.text_input("Number")
             data["IMEI"] = st.text_input("IMEI")
 
         elif entity_type == "Bank Account":
-            st.subheader("Bank Account")
-            data["Bank"] = st.text_input("Bank Name")
+            data["Bank"] = st.text_input("Bank")
             c1,c2 = st.columns(2)
             with c1: data["BSB"] = st.text_input("BSB")
-            with c2: data["Account Number"] = st.text_input("Account Number")
-            data["Holder Name"] = st.text_input("Account Holder")
+            with c2: data["Account"] = st.text_input("Account No.")
 
         elif entity_type == "Location":
-            st.subheader("Location Details")
-            data["Location Name"] = st.text_input("Name/Description")
-            data["Address"] = st.text_input("Full Address")
+            data["Name"] = st.text_input("Location Name")
+            data["Address"] = st.text_input("Address")
 
-        if st.form_submit_button("Save Entity to Project", type="primary"):
+        if st.form_submit_button("Save to Library", type="primary"):
             label = {
-                "Person": f"{data.get('First Name','')} {data.get('Last Name','')}".strip() or "Person",
-                "Organisation": data.get("Company Name", "Organisation"),
-                "Vehicle": data.get("Registration", "Vehicle"),
-                "Phone": data.get("Phone Number", "Phone"),
-                "Bank Account": f"{data.get('BSB','')}-{data.get('Account Number','')}",
-                "Location": data.get("Location Name") or data.get("Address", "Location")
+                "Person": f"{data.get('First','')} {data.get('Last','')}".strip() or "Person",
+                "Organisation": data.get("Name","Org"),
+                "Vehicle": data.get("Rego","Vehicle"),
+                "Phone": data.get("Number","Phone"),
+                "Bank Account": f"{data.get('BSB','')}-{data.get('Account','')}",
+                "Location": data.get("Name") or data.get("Address","Location")
             }[entity_type]
 
             entity = {
@@ -129,7 +117,9 @@ with st.sidebar:
                 "type": entity_type,
                 "label": label,
                 "data": data,
-                "icon": ICONS[entity_type]
+                "color": ENTITY_CONFIG[entity_type]["color"],
+                "icon": ENTITY_CONFIG[entity_type]["icon"],
+                "x": 0, "y": 0, "fixed": False
             }
             st.session_state.library.append(entity)
             st.success(f"Saved: {label}")
@@ -138,58 +128,99 @@ with st.sidebar:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # LIBRARY
+    # LIBRARY → CLICK TO ADD TO CANVAS
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Entity Library")
+    st.markdown("### 2. Click to Place on Canvas")
     for e in st.session_state.library:
-        if st.button(f"{e['type']} {e['label']}", key=f"add_{e['id']}"):
-            if e not in st.session_state.canvas:
-                st.session_state.canvas.append(e)
+        if st.button(f"{e['type']} {e['label']}", key=f"place_{e['id']}"):
+            # Add to canvas with random position
+            import random
+            e_copy = e.copy()
+            e_copy.update({"x": random.randint(-400,400), "y": random.randint(-400,400), "fixed": True})
+            if e_copy not in st.session_state.canvas:
+                st.session_state.canvas.append(e_copy)
                 st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# CANVAS
+# MAIN CANVAS — FULLY INTERACTIVE
 c1, c2 = st.columns([4,1])
 
 with c1:
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("### Link Analysis Canvas")
+    st.markdown("### Link Analysis Canvas — Drag & Link Freely")
 
-    net = Network(height="880px", bgcolor="#ffffff", font_color="#111827", directed=True, notebook=True)
-    net.force_atlas_2based()
+    net = Network(height="900px", bgcolor="#ffffff", directed=True, notebook=True)
+    net.set_options("""
+    var options = {
+      "physics": {"enabled": true, "stabilization": {"iterations": 100}},
+      "interaction": {"dragNodes": true, "dragView": true, "zoomView": true},
+      "nodes": {"shape": "image", "size": 60, "font": {"multi": "html", "size": 18}},
+      "edges": {"smooth": true, "arrows": "to"}
+    }
+    """)
 
+    # Add nodes with color + data under icon
     for ent in st.session_state.canvas:
-        lines = [f"<b>{ent['label']}</b>"]
-        if ent["type"] == "Person" and ent["data"].get("Phone Number"):
-            lines.append(ent["data"]["Phone Number"])
-        if ent["type"] == "Vehicle" and ent["data"].get("Registration"):
-            lines.append(ent["data"]["Registration"])
+        lines = [f"<b style='font-size:20px'>{ent['label']}</b>"]
+        if ent["type"] == "Person" and ent["data"].get("Phone"): lines.append(ent["data"]["Phone"])
+        if ent["type"] == "Vehicle" and ent["data"].get("Rego"): lines.append(ent["data"]["Rego"])
+        if ent["type"] == "Bank Account": lines.append(f"{ent['data'].get('BSB','')}-{ent['data'].get('Account','')}")
         label_html = "<br>".join(lines)
 
         tooltip = "<br>".join([f"<b>{ent['label']}</b>"] + 
                              [f"{k}: {v if not isinstance(v,date) else v.strftime('%d/%m/%Y')}" 
-                              for k,v in ent["data"].items() if v and v != date(1,1,1)])
+                              for k,v in ent["data"].items() if v])
 
-        net.add_node(ent["id"], label=label_html, shape="image", image=ent["icon"],
-                     title=tooltip, size=60, font={"multi": "html", "size": 18})
+        net.add_node(
+            ent["id"],
+            label=label_html,
+            image=ent["icon"],
+            title=tooltip,
+            color=ent["color"],
+            x=ent["x"], y=ent["y"],
+            fixed=ent["fixed"]
+        )
 
+    # Add existing links
     for link in st.session_state.links:
-        if link["from"] in [e["id"] for e in st.session_state.canvas]:
-            net.add_edge(link["from"], link["to"], label=link["type"], color="#3b82f6", width=4, arrows="to")
+        net.add_edge(link["from"], link["to"],
+                     label=link.get("label",""),
+                     color=link.get("color","#3b82f6"),
+                     width=link.get("width",4),
+                     dashes=link.get("dashes",False),
+                     arrows=link.get("arrows","to"))
 
-    components.html(net.generate_html(), height=880, scrolling=True)
+    components.html(net.generate_html(), height=900, scrolling=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # LINK CREATOR
+    # ADVANCED LINK TOOL
     if len(st.session_state.canvas) >= 2:
         st.markdown("<div class='glass'>", unsafe_allow_html=True)
-        st.markdown("### Create Link")
-        labels = {e["id"]: e["label"] for e in st.session_state.canvas}
-        f = st.selectbox("From", options=list(labels.keys()), format_func=lambda x: labels[x])
-        t = st.selectbox("To", options=list(labels.keys()), format_func=lambda x: labels[x])
-        typ = st.text_input("Link Type", "Owns • Calls • Lives At")
-        if st.button("Add Link", type="primary"):
-            st.session_state.links.append({"from": f, "to": t, "type": typ})
+        st.markdown("### Create Advanced Link")
+
+        nodes = {e["id"]: e["label"] for e in st.session_state.canvas}
+        col1, col2 = st.columns(2)
+        with col1:
+            src = st.selectbox("From", options=list(nodes.keys()), format_func=lambda x: nodes[x])
+        with col2:
+            tgt = st.selectbox("To", options=list(nodes.keys()), format_func=lambda x: nodes[x])
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: link_color = st.color_picker("Color", "#3b82f6")
+        with c2: link_width = st.slider("Thickness", 1, 10, 4)
+        with c3: link_style = st.selectbox("Style", ["Solid", "Dashed"])
+        with c4: link_label = st.text_input("Label (optional)", "Owns")
+
+        if st.button("Create Link", type="primary"):
+            st.session_state.links.append({
+                "from": src, "to": tgt,
+                "label": link_label,
+                "color": link_color,
+                "width": link_width,
+                "dashes": link_style == "Dashed",
+                "arrows": "to"
+            })
+            st.success("Link created!")
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -203,20 +234,15 @@ with c2:
             st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# EXPORT — FIXED pandas import
+# EXPORT
 with st.expander("Export Project"):
     if st.session_state.canvas:
-        export_data = []
-        for e in st.session_state.canvas:
-            row = {"Label": e["label"], "Type": e["type"]}
-            row.update({k: v for k, v in e["data"].items() if v})
-            export_data.append(row)
-        df = pd.DataFrame(export_data)
-        st.download_button("Download Entities CSV", df.to_csv(index=False), "entities.csv")
-
+        df = pd.DataFrame([{"Label": e["label"], "Type": e["type"], **e["data"]} for e in st.session_state.canvas])
+        st.download_button("Download Entities", df.to_csv(index=False), "entities.csv")
     if st.session_state.links:
         labels = {e["id"]: e["label"] for e in st.session_state.canvas}
-        links_data = [{"From": labels.get(l["from"], "?"), "To": labels.get(l["to"], "?"), "Type": l["type"]} 
-                     for l in st.session_state.links]
-        links_df = pd.DataFrame(links_data)
-        st.download_button("Download Links CSV", links_df.to_csv(index=False), "links.csv")
+        links_df = pd.DataFrame([{
+            "From": labels.get(l["from"]), "To": labels.get(l["to"]),
+            "Type": l.get("label",""), "Color": l.get("color","#3b82f6")
+        } for l in st.session_state.links])
+        st.download_button("Download Links", links_df.to_csv(index=False), "links.csv")
