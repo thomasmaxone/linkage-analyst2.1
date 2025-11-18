@@ -24,7 +24,6 @@ st.markdown("""
 st.markdown("<h1>AnalystForge Pro</h1>", unsafe_allow_html=True)
 st.caption("Click canvas to place • Drag to move • Click node → node to link")
 
-# REAL PHYSICAL ICONS + COLORS
 ENTITIES = {
     "Person":       {"icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg",       "color": "#ef4444"},
     "Organisation": {"icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/building-fill.svg",     "color": "#8b5cf6"},
@@ -34,11 +33,10 @@ ENTITIES = {
     "Location":     {"icon": "https://raw.githubusercontent.com/twbs/icons/main/icons/house-fill.svg",        "color": "#f97316"}
 }
 
-# Init
-for k in ["library", "canvas", "links", "pending_link", "selected_type"]:
+# Init (removed "pending_link", as it's unused)
+for k in ["library", "canvas", "links", "selected_type"]:
     if k not in st.session_state:
-        st.session_state[k] = [] if k != "pending_link" else None
-        if k == "selected_type": st.session_state[k] = "Person"
+        st.session_state[k] = [] if k not in ["selected_type"] else "Person"
 
 # LEFT SIDEBAR — CHOOSE WHAT TO DROP
 with st.sidebar:
@@ -53,10 +51,9 @@ with st.sidebar:
     st.markdown("Click anywhere on the white canvas to place")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    True)
-
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
     st.markdown("### Entity Library")
+    # NOTE: The library is empty by default; ensure you populate st.session_state.library somewhere!
     for e in st.session_state.library:
         if st.button(f"{e['type']} {e['label']}", key=f"lib_{e['id']}"):
             # Add copy to canvas at random position
@@ -94,7 +91,7 @@ with col_canvas:
         label_html = "<br>".join(lines)
 
         tooltip = "<br>".join([f"<b>{ent['label']}</b>"] +
-                             [f"{k}: {v if not isinstance(v,date) else v.strftime('%d/%m/%Y')}" 
+                             [f"{k}: {v if not isinstance(v,date) else v.strftime('%d/%m/%Y')}"
                               for k,v in ent["data"].items() if v])
 
         net.add_node(
@@ -121,6 +118,7 @@ with col_canvas:
     # === MAGIC: CAPTURE CLICKS ON CANVAS ===
     graph_html = net.generate_html()
     # Inject JavaScript to capture node clicks and canvas clicks
+    # Fix: we set display:block/none for link_status overlay for visibility!
     graph_html = graph_html.replace(
         "</head>",
         """
@@ -136,13 +134,15 @@ with col_canvas:
                     waitingForSecondClick = true;
                     firstNode = nodeId;
                     document.getElementById('link_status').innerText = "Select target node...";
+                    document.getElementById('link_status').style.display = "block";
                 } else {
                     // Create link
                     fetch(`/link?from=${firstNode}&to=${nodeId}`);
                     waitingForSecondClick = false;
                     firstNode = null;
                     document.getElementById('link_status').innerText = "Link created";
-                    setTimeout(() => document.getElementById('link_status').innerText = "", 2000);
+                    document.getElementById('link_status').style.display = "block";
+                    setTimeout(() => document.getElementById('link_status').style.display = "none", 2000);
                 }
             } else if (params.nodes.length === 0 && params.pointer.canvas) {
                 // Clicked empty space → place new entity
@@ -167,6 +167,7 @@ with col_canvas:
         "<body>",
         f"<body><input type='hidden' id='selected_type' value='{st.session_state.selected_type}'>"
     )
+    # Fix: display: none by default; JS will set display: block when needed.
     graph_html = graph_html.replace(
         "</body>",
         "<div id='link_status' style='position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#10b981; color:white; padding:12px 24px; border-radius:12px; font-weight:600; z-index:1000; display:none;'></div></body>"
@@ -203,10 +204,24 @@ with col_right:
     st.markdown("</div>", unsafe_allow_html=True)
 
 # HIDDEN ENDPOINTS FOR JS CALLS
-if st.query_params.get("place"):
-    x = int(st.query_params["x"])
-    y = int(st.query_params["y"])
-    typ = st.query_params["type"]
+# -- Workaround for Streamlit versions and "query params" --
+try:  # modern
+    query_params = st.query_params
+except AttributeError:  # legacy
+    query_params = st.experimental_get_query_params()
+
+def getparam(key, as_type=str):
+    val = query_params.get(key)
+    if val is None:
+        return None
+    if isinstance(val, list):  # old Streamlit: value is always a list
+        val = val[0]
+    return as_type(val)
+
+if getparam("place"):
+    x = int(getparam("x"))
+    y = int(getparam("y"))
+    typ = getparam("type")
     # create new entity directly on canvas
     data = {"Created": "Canvas drop"}
     label = f"New {typ.lower()}"
@@ -222,9 +237,9 @@ if st.query_params.get("place"):
     st.session_state.canvas.append(new_ent)
     st.rerun()
 
-if st.query_params.get("link"):
-    from_id = st.query_params["from"]
-    to_id = st.query_params["to"]
+if getparam("link"):
+    from_id = getparam("from")
+    to_id = getparam("to")
     style = st.session_state.get("pending_style", {"color":"#6366f1","width":4,"dashes":False,"label":""})
     st.session_state.links.append({
         "from": from_id, "to": to_id,
@@ -235,8 +250,8 @@ if st.query_params.get("link"):
     })
     st.rerun()
 
-if st.query_params.get("delete"):
-    node_id = st.query_params["node"]
+if getparam("delete"):
+    node_id = getparam("node")
     st.session_state.canvas = [e for e in st.session_state.canvas if e["id"] != node_id]
     st.session_state.links = [l for l in st.session_state.links if l["from"] != node_id and l["to"] != node_id]
     st.rerun()
