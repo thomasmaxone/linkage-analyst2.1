@@ -1,6 +1,3 @@
-assets/icons/person.svg
-assets/icons/building.svg
-assets/icons/car-front.svg
-assets/icons/phone.svg
-assets/icons/piggy-bank.svg
-assets/icons/house.svg
+streamlit
+pyvis
+pandas
