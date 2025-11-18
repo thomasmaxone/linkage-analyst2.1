@@ -1,6 +1,6 @@
-import streamlit as st
-import pandas as pd
-from pyvis.network import Network
-import streamlit.components.v1 as components
-import uuid
-from datetime import date, datetime
+assets/icons/person.svg
+assets/icons/building.svg
+assets/icons/car-front.svg
+assets/icons/phone.svg
+assets/icons/piggy-bank.svg
+assets/icons/house.svg
